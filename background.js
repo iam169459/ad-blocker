@@ -175,6 +175,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
 
+        case 'GET_PAGE_STATS':
+          // Get page-specific statistics from request log
+          const log = await statisticsManager.getRequestLog(10000);
+          const pageEntries = log.filter(e => e.url && new URL(e.url).hostname === message.domain);
+          sendResponse({ count: pageEntries.length });
+          break;
+
+        case 'RESET_ALL':
+          await settingsManager.reset();
+          await statisticsManager.reset();
+          await rulesManager.importCustomRules([]);
+          await rulesManager.importAllowlist([]);
+          await filterListManager.updateAllLists();
+          updateBadge();
+          sendResponse({ success: true });
+          break;
+
+        case 'ADD_COSMETIC_FILTER':
+          // Add cosmetic filter as custom rule via RulesManager
+          await rulesManager.addCosmeticFilter(message.selector, message.domain);
+          sendResponse({ success: true });
+          break;
+
+        case 'ZAPPER_BLOCK_ELEMENT':
+          await rulesManager.addCosmeticFilter(message.selector, message.domain);
+          sendResponse({ success: true });
+          break;
+
+        case 'ZAPPER_HIDE_ELEMENT':
+          // For hide, we add a cosmetic filter with hide action
+          const hideRule = {
+            type: 'cosmetic',
+            pattern: message.selector,
+            domain: message.domain,
+            action: 'hide',
+            description: `Hidden element on ${message.domain}`
+          };
+          const rules = await rulesManager.getCustomRules();
+          const newRule = {
+            id: Date.now(),
+            ...hideRule,
+            createdAt: Date.now()
+          };
+          rules.push(newRule);
+          await chrome.storage.local.set({ custom_rules: rules });
+          await rulesManager.syncRules();
+          sendResponse({ success: true });
+          break;
+
         default:
           sendResponse({ error: 'Unknown message type' });
       }
@@ -302,7 +351,7 @@ async function setEnabled(enabled) {
   updateBadge();
 }
 
-async function updateBadge(tabId?) {
+async function updateBadge(tabId) {
   const stats = await statisticsManager.getStatistics('total');
   const count = stats.totalBlocked;
   const text = count > 999 ? '999+' : count > 0 ? count.toString() : '';
