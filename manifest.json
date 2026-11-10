@@ -1,0 +1,127 @@
+{
+  "manifest_version": 3,
+  "name": "Purple Ad Blocker",
+  "version": "2.0.0",
+  "description": "Professional-grade ad blocker with filter lists, element zapper, detailed statistics, and per-site controls. Created by purple-dev.",
+  "author": "purple-dev",
+  "homepage_url": "https://github.com/purple-dev",
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "declarativeNetRequestWithHostAccess",
+    "storage",
+    "tabs",
+    "scripting",
+    "contextMenus",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_base",
+        "enabled": true,
+        "path": "rules/base.json"
+      },
+      {
+        "id": "ruleset_easylist",
+        "enabled": false,
+        "path": "rules/easylist.json"
+      },
+      {
+        "id": "ruleset_easyprivacy",
+        "enabled": false,
+        "path": "rules/easyprivacy.json"
+      },
+      {
+        "id": "ruleset_custom",
+        "enabled": true,
+        "path": "rules/custom.json"
+      },
+      {
+        "id": "ruleset_allowlist",
+        "enabled": true,
+        "path": "rules/allowlist.json"
+      },
+      {
+        "id": "ruleset_dynamic",
+        "enabled": true,
+        "path": "rules/dynamic.json"
+      }
+    ],
+    "max_number_of_enabled_rulesets": 6,
+    "max_number_of_dynamic_rules": 5000,
+    "max_number_of_session_rules": 5000
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-zapper.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "pages/popup.html",
+    "default_title": "Purple Ad Blocker",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    }
+  },
+  "options_ui": {
+    "page": "pages/options.html",
+    "open_in_tab": true
+  },
+  "options_page": "pages/options.html",
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  },
+  "commands": {
+    "toggle-enabled": {
+      "suggested_key": {
+        "default": "Alt+Shift+A",
+        "mac": "Alt+Shift+A"
+      },
+      "description": "Toggle ad blocking on/off"
+    },
+    "open-zapper": {
+      "suggested_key": {
+        "default": "Alt+Shift+Z",
+        "mac": "Alt+Shift+Z"
+      },
+      "description": "Open element zapper"
+    },
+    "open-settings": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Open settings"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["zapper-ui.html", "zapper-ui.css", "picker-ui.html", "picker-ui.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "minimum_chrome_version": "88"
+}

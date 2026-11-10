@@ -1,0 +1,141 @@
+/* Advanced Ad Blocker Pro - Content CSS */
+/* Pre-emptive hiding of common ad elements to prevent flicker */
+
+[data-adblocker-blocked],
+[data-adblocker-hidden],
+[data-adblocker-zapped] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Common ad patterns - hide immediately */
+.adsbygoogle,
+.adsbygoogle *,
+[data-ad-client],
+[data-ad-slot],
+.ad-unit,
+.ad-container,
+.ad-wrapper,
+.ad-banner,
+.ad-header,
+.ad-footer,
+.ad-sidebar,
+.ad-slot,
+.ad-place,
+.ad-space,
+.ad-area,
+.ad-box,
+.advert-box,
+.advertisement-box,
+.banner-ad,
+.banner_ads,
+.advertising,
+.advert,
+.ads,
+#ads,
+#ad,
+.native-ad,
+.native-ad-item,
+.recommended-content,
+.recommended-links,
+.content-recommendation,
+.outbrain,
+.taboola,
+[data-widget*="taboola"],
+[data-widget*="outbrain"],
+.newsletter-popup,
+.email-popup,
+.subscribe-popup,
+[class*="newsletter"],
+[class*="subscribe-modal"],
+.cookie-banner,
+.cookie-notice,
+.gdpr-banner,
+.consent-banner,
+#cookie-law,
+#cookie-banner,
+.popup-ad,
+.overlay-ad,
+.interstitial-ad,
+.preroll-ad,
+.midroll-ad,
+.postroll-ad,
+.video-ad,
+.ad-overlay,
+.ad-modal,
+.ad-popup {
+  display: none !important;
+}
+
+/* Iframe ads */
+iframe[src*="doubleclick"],
+iframe[src*="googlesyndication"],
+iframe[src*="googleadservices"],
+iframe[src*="amazon-adsystem"],
+iframe[src*="facebook.com/tr"],
+iframe[src*="pubmatic"],
+iframe[src*="rubiconproject"],
+iframe[src*="openx.net"],
+iframe[src*="adnxs"],
+iframe[src*="taboola"],
+iframe[src*="outbrain"],
+iframe[src*="criteo"],
+iframe[src*="adsafeprotected"],
+iframe[src*="moatads"],
+iframe[src*="scorecardresearch"],
+iframe[src*="quantserve"],
+iframe[id*="google_ads"],
+iframe[name*="google_ads"] {
+  display: none !important;
+}
+
+/* Generic ad class patterns - more specific to avoid false positives */
+[class*="ad-banner"],
+[class*="ad-header"],
+[class*="ad-footer"],
+[class*="ad-sidebar"],
+[class*="ad-slot"],
+[class*="ad-place"],
+[class*="ad-space"],
+[class*="ad-area"],
+[id*="ad-banner"],
+[id*="ad-header"],
+[id*="ad-footer"],
+[id*="ad-sidebar"],
+[id*="ad-slot"],
+[id*="ad-place"],
+[id*="ad-space"],
+[id*="ad-area"] {
+  display: none !important;
+}
+
+/* Sponsored content */
+[class*="sponsored"],
+[id*="sponsored"],
+.sponsored-content,
+.sponsored-link,
+.sponsored-post {
+  display: none !important;
+}
+
+/* Social widgets that are often ads */
+.social-widget,
+.social-buttons,
+.share-buttons,
+.share-widget {
+  display: none !important;
+}
+
+/* Zapper styles */
+.adblocker-zapper-hover {
+  outline: 2px solid #ff4444 !important;
+  outline-offset: 2px !important;
+  background-color: rgba(255, 68, 68, 0.1) !important;
+  cursor: crosshair !important;
+}
+
+.adblocker-zapper-selected {
+  outline: 2px solid #44ff44 !important;
+  outline-offset: 2px !important;
+  background-color: rgba(68, 255, 68, 0.1) !important;
+}
