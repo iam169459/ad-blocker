@@ -67,12 +67,6 @@
       "css": ["content.css"],
       "run_at": "document_start",
       "all_frames": true
-    },
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content-zapper.js"],
-      "run_at": "document_idle",
-      "all_frames": false
     }
   ],
   "action": {
@@ -119,7 +113,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["zapper-ui.html", "zapper-ui.css", "picker-ui.html", "picker-ui.css"],
+      "resources": ["zapper-injected.js"],
       "matches": ["<all_urls>"]
     }
   ],

@@ -501,7 +501,8 @@
         break;
       case 'hide':
         hideElement(target, selector);
-        break      case 'inspect':
+        break;
+      case 'inspect':
         inspectElement(target, selector);
         break;
     }

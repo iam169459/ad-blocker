@@ -1038,6 +1038,9 @@ function applySavedTheme() {
   applyTheme(theme);
 }
 
+// Back button handler
+document.getElementById('backBtn')?.addEventListener('click', () => window.close());
+
 // Start
 applySavedTheme();
 init();
