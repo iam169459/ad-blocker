@@ -131,12 +131,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case 'OPEN_ZAPPER':
-          await elementZapper.activate(sender.tab.id);
+          await elementZapper.activate(sender.tab?.id);
           sendResponse({ success: true });
           break;
 
         case 'GET_ZAPPER_STATE':
-          sendResponse(await elementZapper.getState(sender.tab.id));
+          sendResponse(await elementZapper.getState(sender.tab?.id));
           break;
 
         case 'GET_SETTINGS':
