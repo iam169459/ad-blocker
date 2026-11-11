@@ -1,5 +1,5 @@
 // Purple Ad Blocker - Popup Script
-import { showStatus } from './utils.js';
+import { showStatus, formatNumber, escapeHtml } from './utils.js';
 
 const mainToggle = document.getElementById('mainToggle');
 const statusText = document.getElementById('statusText');
@@ -92,25 +92,34 @@ async function toggleProtection() {
   }
 }
 
-function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return num.toString();
-}
-
 function renderFilterLists(filters) {
-  filterListsEl.innerHTML = filters.map(filter => `
-    <div class="filter-item">
-      <div class="filter-info">
-        <span class="filter-name">${filter.name}</span>
-        <span class="filter-desc">${filter.description} ${filter.enabled ? `• ${filter.ruleCount.toLocaleString()} rules` : '• Disabled'}</span>
-      </div>
-      <button class="filter-toggle ${filter.enabled ? 'active' : ''}" data-list="${filter.id}" aria-label="${filter.enabled ? 'Disable' : 'Enable'} ${filter.name}"></button>
-    </div>
-  `).join('');
+  // Clear existing content
+  filterListsEl.textContent = '';
 
-  filterListsEl.querySelectorAll('.filter-toggle').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+  filters.forEach(filter => {
+    const item = document.createElement('div');
+    item.className = 'filter-item';
+
+    const info = document.createElement('div');
+    info.className = 'filter-info';
+
+    const name = document.createElement('span');
+    name.className = 'filter-name';
+    name.textContent = filter.name;
+
+    const desc = document.createElement('span');
+    desc.className = 'filter-desc';
+    desc.textContent = `${filter.description} ${filter.enabled ? `• ${filter.ruleCount.toLocaleString()} rules` : '• Disabled'}`;
+
+    info.appendChild(name);
+    info.appendChild(desc);
+
+    const toggle = document.createElement('button');
+    toggle.className = `filter-toggle ${filter.enabled ? 'active' : ''}`;
+    toggle.dataset.list = filter.id;
+    toggle.setAttribute('aria-label', `${filter.enabled ? 'Disable' : 'Enable'} ${filter.name}`);
+
+    toggle.addEventListener('click', async (e) => {
       const listId = e.currentTarget.dataset.list;
       const isActive = e.currentTarget.classList.contains('active');
       try {
@@ -121,6 +130,10 @@ function renderFilterLists(filters) {
         showStatus('Failed to toggle filter list', 'error');
       }
     });
+
+    item.appendChild(info);
+    item.appendChild(toggle);
+    filterListsEl.appendChild(item);
   });
 }
 

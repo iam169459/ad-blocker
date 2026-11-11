@@ -1,5 +1,5 @@
 // Purple Ad Blocker - Options Script
-import { showStatus, escapeHtml } from './utils.js';
+import { showStatus, escapeHtml, formatNumber, downloadJSON } from './utils.js';
 
 const nav = document.getElementById('optionsNav');
 const body = document.getElementById('optionsBody');
@@ -24,23 +24,35 @@ let customRules = [];
 let allowlist = [];
 let statistics = {};
 
+// Utility functions for safe DOM creation
+function createEl(tag, className, textContent, attributes = {}) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (textContent) el.textContent = textContent;
+  Object.entries(attributes).forEach(([key, value]) => el.setAttribute(key, value));
+  return el;
+}
+
+function createSvg(innerHTML) {
+  const div = document.createElement('div');
+  div.innerHTML = innerHTML;
+  return div.firstElementChild;
+}
+
+function clearEl(el) {
+  el.textContent = '';
+}
+
 // Initialize
 async function init() {
-  // Load all data
   await loadAllData();
-
-  // Render navigation
   renderNav();
-
-  // Render initial tab
   renderTab(currentTab);
 
-  // Event listeners
   btnExport.addEventListener('click', exportSettings);
   btnImport.addEventListener('click', () => importFile.click());
   importFile.addEventListener('change', importSettings);
 
-  // Listen for storage changes
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.adblock_settings) loadAllData();
     if (changes.filterLists) loadFilterLists();
@@ -87,15 +99,14 @@ async function loadStatistics() {
 }
 
 function renderNav() {
-  nav.innerHTML = TABS.map(tab => `
-    <button class="nav-item ${tab.id === currentTab ? 'active' : ''}" data-tab="${tab.id}" aria-label="${tab.label}">
-      ${tab.icon}
-      <span>${tab.label}</span>
-    </button>
-  `).join('');
-
-  nav.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  clearEl(nav);
+  TABS.forEach(tab => {
+    const btn = createEl('button', `nav-item ${tab.id === currentTab ? 'active' : ''}`, '', { 'data-tab': tab.id, 'aria-label': tab.label });
+    btn.appendChild(createSvg(tab.icon));
+    const span = createEl('span', '', tab.label);
+    btn.appendChild(span);
+    btn.addEventListener('click', () => switchTab(tab.id));
+    nav.appendChild(btn);
   });
 }
 
@@ -121,144 +132,81 @@ function renderTab(tabId) {
 
 // General Tab
 function renderGeneralTab() {
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">General</h2>
-        <p class="panel-subtitle">Configure core ad blocking behavior</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        <h3 class="section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-          Protection
-        </h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Enable Ad Blocking</div>
-            <div class="setting-desc">Block ads, trackers, and malware on all websites</div>
-          </div>
-          <button class="toggle-switch ${settings.enabled !== false ? 'active' : ''}" data-setting="enabled" aria-label="Enable ad blocking"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Cosmetic Filtering</div>
-            <div class="setting-desc">Hide ad elements on pages (element hiding)</div>
-          </div>
-          <button class="toggle-switch ${settings.cosmeticFiltering !== false ? 'active' : ''}" data-setting="cosmeticFiltering" aria-label="Enable cosmetic filtering"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Element Zapper</div>
-            <div class="setting-desc">Click elements on pages to block or hide them</div>
-          </div>
-          <button class="toggle-switch ${settings.elementZapper !== false ? 'active' : ''}" data-setting="elementZapper" aria-label="Enable element zapper"></button>
-        </div>
-      </section>
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'General'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Configure core ad blocking behavior'));
+  panel.appendChild(header);
 
-      <section class="section">
-        <h3 class="section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 0 0 3 11.21a9 9 0 0 1 0 15.58A9 9 0 0 1 12.79 21 7 7 0 0 0 21 12.79z"/></svg>
-          Blocking Options
-        </h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Ads</div>
-            <div class="setting-desc">Block advertisement content</div>
-          </div>
-          <button class="toggle-switch ${settings.blockAds !== false ? 'active' : ''}" data-setting="blockAds"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Trackers</div>
-            <div class="setting-desc">Block tracking scripts and pixels</div>
-          </div>
-          <button class="toggle-switch ${settings.blockTrackers !== false ? 'active' : ''}" data-setting="blockTrackers"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Malware Domains</div>
-            <div class="setting-desc">Block known malware and phishing domains</div>
-          </div>
-          <button class="toggle-switch ${settings.blockMalware ? 'active' : ''}" data-setting="blockMalware"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Annoyances</div>
-            <div class="setting-desc">Block cookie notices, newsletter popups, etc.</div>
-          </div>
-          <button class="toggle-switch ${settings.blockAnnoyances ? 'active' : ''}" data-setting="blockAnnoyances"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Third-Party Requests</div>
-            <div class="setting-desc">Block all third-party network requests (may break sites)</div>
-          </div>
-          <button class="toggle-switch ${settings.blockThirdParty ? 'active' : ''}" data-setting="blockThirdParty"></button>
-        </div>
-      </section>
+  // Protection section
+  const protectionSection = createEl('section', 'section');
+  const protectionTitle = createEl('h3', 'section-title');
+  protectionTitle.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>'));
+  protectionTitle.appendChild(document.createTextNode('Protection'));
+  protectionSection.appendChild(protectionTitle);
 
-      <section class="section">
-        <h3 class="section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          Appearance & Behavior
-        </h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Theme</div>
-            <div class="setting-desc">Choose color theme</div>
-          </div>
-          <select class="select" data-setting="theme" style="width: auto; min-width: 140px;">
-            <option value="system" ${settings.theme === 'system' ? 'selected' : ''}>System</option>
-            <option value="light" ${settings.theme === 'light' ? 'selected' : ''}>Light</option>
-            <option value="dark" ${settings.theme === 'dark' ? 'selected' : ''}>Dark</option>
-          </select>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Show Badge Count</div>
-            <div class="setting-desc">Display blocked count on extension icon</div>
-          </div>
-          <button class="toggle-switch ${settings.showBadge !== false ? 'active' : ''}" data-setting="showBadge"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Show Notifications</div>
-            <div class="setting-desc">Show desktop notifications for important events</div>
-          </div>
-          <button class="toggle-switch ${settings.showNotifications ? 'active' : ''}" data-setting="showNotifications"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Log Blocked Requests</div>
-            <div class="setting-desc">Keep detailed log of blocked requests for statistics</div>
-          </div>
-          <button class="toggle-switch ${settings.logRequests !== false ? 'active' : ''}" data-setting="logRequests"></button>
-        </div>
-      </section>
+  protectionSection.appendChild(createSettingRow('Enable Ad Blocking', 'Block ads, trackers, and malware on all websites', 'enabled', settings.enabled !== false));
+  protectionSection.appendChild(createSettingRow('Cosmetic Filtering', 'Hide ad elements on pages (element hiding)', 'cosmeticFiltering', settings.cosmeticFiltering !== false));
+  protectionSection.appendChild(createSettingRow('Element Zapper', 'Click elements on pages to block or hide them', 'elementZapper', settings.elementZapper !== false));
+  panel.appendChild(protectionSection);
 
-      <section class="section">
-        <h3 class="section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Auto-Update
-        </h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Auto-Update Filter Lists</div>
-            <div class="setting-desc">Automatically download latest filter lists daily</div>
-          </div>
-          <button class="toggle-switch ${settings.autoUpdateFilters !== false ? 'active' : ''}" data-setting="autoUpdateFilters"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Last Update</div>
-            <div class="setting-desc">${filterLists.length > 0 ? new Date(Math.max(...filterLists.map(f => f.lastUpdated || 0))).toLocaleString() : 'Never'}</div>
-          </div>
-          <button class="btn btn-secondary" id="btnUpdateNow">Update Now</button>
-        </div>
-      </section>
-    </div>
-  `;
+  // Blocking Options section
+  const blockingSection = createEl('section', 'section');
+  const blockingTitle = createEl('h3', 'section-title');
+  blockingTitle.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 0 0 3 11.21a9 9 0 0 1 0 15.58A9 9 0 0 1 12.79 21 7 7 0 0 0 21 12.79z"/></svg>'));
+  blockingTitle.appendChild(document.createTextNode('Blocking Options'));
+  blockingSection.appendChild(blockingTitle);
+
+  blockingSection.appendChild(createSettingRow('Block Ads', 'Block advertisement content', 'blockAds', settings.blockAds !== false));
+  blockingSection.appendChild(createSettingRow('Block Trackers', 'Block tracking scripts and pixels', 'blockTrackers', settings.blockTrackers !== false));
+  blockingSection.appendChild(createSettingRow('Block Malware Domains', 'Block known malware and phishing domains', 'blockMalware', settings.blockMalware));
+  blockingSection.appendChild(createSettingRow('Block Annoyances', 'Block cookie notices, newsletter popups, etc.', 'blockAnnoyances', settings.blockAnnoyances));
+  blockingSection.appendChild(createSettingRow('Block Third-Party Requests', 'Block all third-party network requests (may break sites)', 'blockThirdParty', settings.blockThirdParty));
+  panel.appendChild(blockingSection);
+
+  // Appearance & Behavior section
+  const appearanceSection = createEl('section', 'section');
+  const appearanceTitle = createEl('h3', 'section-title');
+  appearanceTitle.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'));
+  appearanceTitle.appendChild(document.createTextNode('Appearance & Behavior'));
+  appearanceSection.appendChild(appearanceTitle);
+
+  appearanceSection.appendChild(createSelectRow('Theme', 'Choose color theme', 'theme', [
+    { value: 'system', label: 'System', selected: settings.theme === 'system' },
+    { value: 'light', label: 'Light', selected: settings.theme === 'light' },
+    { value: 'dark', label: 'Dark', selected: settings.theme === 'dark' }
+  ]));
+
+  appearanceSection.appendChild(createSettingRow('Show Badge Count', 'Display blocked count on extension icon', 'showBadge', settings.showBadge !== false));
+  appearanceSection.appendChild(createSettingRow('Show Notifications', 'Show desktop notifications for important events', 'showNotifications', settings.showNotifications));
+  appearanceSection.appendChild(createSettingRow('Log Blocked Requests', 'Keep detailed log of blocked requests for statistics', 'logRequests', settings.logRequests !== false));
+  panel.appendChild(appearanceSection);
+
+  // Auto-Update section
+  const updateSection = createEl('section', 'section');
+  const updateTitle = createEl('h3', 'section-title');
+  updateTitle.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'));
+  updateTitle.appendChild(document.createTextNode('Auto-Update'));
+  updateSection.appendChild(updateTitle);
+
+  updateSection.appendChild(createSettingRow('Auto-Update Filter Lists', 'Automatically download latest filter lists daily', 'autoUpdateFilters', settings.autoUpdateFilters !== false));
+
+  const lastUpdateRow = createEl('div', 'setting-row');
+  const lastUpdateInfo = createEl('div', 'setting-info');
+  lastUpdateInfo.appendChild(createEl('div', 'setting-label', 'Last Update'));
+  const lastUpdateDesc = createEl('div', 'setting-desc');
+  const lastUpdate = filterLists.length > 0 ? new Date(Math.max(...filterLists.map(f => f.lastUpdated || 0))).toLocaleString() : 'Never';
+  lastUpdateDesc.textContent = lastUpdate;
+  lastUpdateInfo.appendChild(lastUpdateDesc);
+  lastUpdateRow.appendChild(lastUpdateInfo);
+  const btnUpdateNow = createEl('button', 'btn btn-secondary', 'Update Now', { id: 'btnUpdateNow' });
+  lastUpdateRow.appendChild(btnUpdateNow);
+  updateSection.appendChild(lastUpdateRow);
+  panel.appendChild(updateSection);
+
+  body.appendChild(panel);
 
   // Bind toggle switches
   body.querySelectorAll('.toggle-switch[data-setting]').forEach(btn => {
@@ -309,61 +257,91 @@ function applyTheme(theme) {
   }
 }
 
+function createSettingRow(label, desc, settingKey, active) {
+  const row = createEl('div', 'setting-row');
+  const info = createEl('div', 'setting-info');
+  info.appendChild(createEl('div', 'setting-label', label));
+  info.appendChild(createEl('div', 'setting-desc', desc));
+  row.appendChild(info);
+  const toggle = createEl('button', `toggle-switch ${active ? 'active' : ''}`, '', { 'data-setting': settingKey, 'aria-label': label });
+  row.appendChild(toggle);
+  return row;
+}
+
+function createSelectRow(label, desc, settingKey, options) {
+  const row = createEl('div', 'setting-row');
+  const info = createEl('div', 'setting-info');
+  info.appendChild(createEl('div', 'setting-label', label));
+  info.appendChild(createEl('div', 'setting-desc', desc));
+  row.appendChild(info);
+  const select = createEl('select', 'select', '', { 'data-setting': settingKey, 'style': 'width: auto; min-width: 140px;' });
+  options.forEach(opt => {
+    const option = createEl('option', '', opt.label, { value: opt.value });
+    if (opt.selected) option.selected = true;
+    select.appendChild(option);
+  });
+  row.appendChild(select);
+  return row;
+}
+
 // Filters Tab
 function renderFiltersTab() {
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">Filter Lists</h2>
-        <p class="panel-subtitle">Manage filter list subscriptions</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        ${filterLists.length === 0 ? `
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <h3>No filter lists loaded</h3>
-            <p>Filter lists will appear here after first update</p>
-          </div>
-        ` : filterLists.map(filter => `
-          <div class="filter-item">
-            <div class="filter-main">
-              <div class="filter-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              </div>
-              <div class="filter-details">
-                <div class="filter-name">${escapeHtml(filter.name)}</div>
-                <div class="filter-meta">
-                  ${filter.ruleCount.toLocaleString()} rules •
-                  ${filter.lastUpdated ? 'Updated ' + new Date(filter.lastUpdated).toLocaleDateString() : 'Never updated'} •
-                  ${filter.description}
-                </div>
-              </div>
-            </div>
-            <div class="filter-actions">
-              <span class="filter-status ${filter.enabled ? '' : 'inactive'}">
-                ${filter.enabled ? '✓ Enabled' : '✗ Disabled'}
-              </span>
-              <button class="toggle-switch ${filter.enabled ? 'active' : ''}" data-filter="${filter.id}" aria-label="${filter.enabled ? 'Disable' : 'Enable'} ${filter.name}"></button>
-            </div>
-          </div>
-        `).join('')}
-      </section>
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'Filter Lists'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Manage filter list subscriptions'));
+  panel.appendChild(header);
 
-      </section>
+  const section = createEl('section', 'section');
+  if (filterLists.length === 0) {
+    const empty = createEl('div', 'empty-state');
+    empty.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'));
+    empty.appendChild(createEl('h3', '', 'No filter lists loaded'));
+    empty.appendChild(createEl('p', '', 'Filter lists will appear here after first update'));
+    section.appendChild(empty);
+  } else {
+    filterLists.forEach(filter => {
+      const item = createEl('div', 'filter-item');
+      const main = createEl('div', 'filter-main');
+      const icon = createEl('div', 'filter-icon');
+      icon.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'));
+      main.appendChild(icon);
+      const details = createEl('div', 'filter-details');
+      details.appendChild(createEl('div', 'filter-name', filter.name));
+      const meta = createEl('div', 'filter-meta');
+      meta.textContent = `${filter.ruleCount.toLocaleString()} rules • ${filter.lastUpdated ? 'Updated ' + new Date(filter.lastUpdated).toLocaleDateString() : 'Never updated'} • ${filter.description}`;
+      details.appendChild(meta);
+      main.appendChild(details);
+      item.appendChild(main);
 
-      <section class="section">
-        <h3 class="section-title">Update Source</h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Secure GitHub Updates</div>
-            <div class="setting-desc">Filter lists are automatically updated from a secure, hardcoded GitHub repository. The update URL cannot be changed for security.</div>
-          </div>
-          <span class="filter-status" style="background: var(--success); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;">✓ Active</span>
-        </div>
-      </section>
-    </div>
-  `;
+      const actions = createEl('div', 'filter-actions');
+      const status = createEl('span', `filter-status ${filter.enabled ? '' : 'inactive'}`, filter.enabled ? '✓ Enabled' : '✗ Disabled');
+      actions.appendChild(status);
+      const toggle = createEl('button', `toggle-switch ${filter.enabled ? 'active' : ''}`, '', { 'data-filter': filter.id, 'aria-label': `${filter.enabled ? 'Disable' : 'Enable'} ${filter.name}` });
+      actions.appendChild(toggle);
+      item.appendChild(actions);
+      section.appendChild(item);
+    });
+  }
+  panel.appendChild(section);
+
+  // Update source info
+  const sourceSection = createEl('section', 'section');
+  const sourceTitle = createEl('h3', 'section-title', 'Update Source');
+  sourceSection.appendChild(sourceTitle);
+  const sourceRow = createEl('div', 'setting-row');
+  const sourceInfo = createEl('div', 'setting-info');
+  sourceInfo.appendChild(createEl('div', 'setting-label', 'Secure GitHub Updates'));
+  sourceInfo.appendChild(createEl('div', 'setting-desc', 'Filter lists are automatically updated from a secure, hardcoded GitHub repository. The update URL cannot be changed for security.'));
+  sourceRow.appendChild(sourceInfo);
+  const statusBadge = createEl('span', 'filter-status', '✓ Active', { style: 'background: var(--success); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px;' });
+  sourceRow.appendChild(statusBadge);
+  sourceSection.appendChild(sourceRow);
+  panel.appendChild(sourceSection);
+
+  body.appendChild(panel);
 
   // Bind filter toggles
   body.querySelectorAll('.toggle-switch[data-filter]').forEach(btn => {
@@ -384,69 +362,78 @@ function renderFiltersTab() {
 
 // Custom Rules Tab
 function renderCustomRulesTab() {
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">Custom Rules</h2>
-        <p class="panel-subtitle">Create your own blocking rules</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        <h3 class="section-title">Add Rule</h3>
-        <div class="form-group">
-          <label>Rule Type</label>
-          <select class="select" id="ruleType">
-            <option value="block">Block Request</option>
-            <option value="hide">Hide Element (Cosmetic)</option>
-            <option value="allow">Allow (Exception)</option>
-            <option value="redirect">Redirect</option>
-            <option value="upgrade">Upgrade to HTTPS</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Pattern (URL filter or CSS selector)</label>
-          <input type="text" class="input" id="rulePattern" placeholder="||example.com^ or .ad-banner" />
-          <p class="hint">Use AdBlock Plus syntax for network filters, CSS selectors for cosmetic filters</p>
-        </div>
-        <div class="form-group" id="ruleDomainsGroup" style="display: none;">
-          <label>Domains (comma-separated, optional)</label>
-          <input type="text" class="input" id="ruleDomains" placeholder="example.com, another.com" />
-          <p class="hint">Limit rule to specific domains (for network filters)</p>
-        </div>
-        <div class="form-group" id="ruleRedirectGroup" style="display: none;">
-          <label>Redirect URL</label>
-          <input type="url" class="input" id="ruleRedirect" placeholder="https://example.com/blank.png" />
-        </div>
-        <button class="btn btn-primary" id="btnAddRule">Add Rule</button>
-      </section>
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'Custom Rules'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Create your own blocking rules'));
+  panel.appendChild(header);
 
-      <section class="section">
-        <h3 class="section-title">Your Rules (${customRules.length})</h3>
-        ${customRules.length === 0 ? `
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <h3>No custom rules yet</h3>
-            <p>Create rules to block specific content or allow exceptions</p>
-          </div>
-        ` : `
-          <div class="rule-list" id="ruleList">
-            ${customRules.map(rule => `
-              <div class="rule-item" data-id="${rule.id}">
-                <span class="rule-type">${rule.type}</span>
-                <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
-                ${rule.domains ? `<span class="rule-pattern" style="color: var(--text-secondary); font-size: 11px;">@ ${escapeHtml(rule.domains.join(', '))}</span>` : ''}
-                <div class="rule-actions">
-                  <button class="btn btn-ghost btn-delete-rule" data-id="${rule.id}" title="Delete" aria-label="Delete rule">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `}
-      </section>
-    </div>
-  `;
+  // Add Rule section
+  const addSection = createEl('section', 'section');
+  addSection.appendChild(createEl('h3', 'section-title', 'Add Rule'));
+
+  const typeGroup = createEl('div', 'form-group');
+  typeGroup.appendChild(createEl('label', '', 'Rule Type'));
+  const typeSelect = createEl('select', 'select', '', { id: 'ruleType' });
+  ['Block Request', 'Hide Element (Cosmetic)', 'Allow (Exception)', 'Redirect', 'Upgrade to HTTPS'].forEach((label, i) => {
+    const opt = createEl('option', '', label, { value: ['block', 'hide', 'allow', 'redirect', 'upgrade'][i] });
+    typeSelect.appendChild(opt);
+  });
+  typeGroup.appendChild(typeSelect);
+  addSection.appendChild(typeGroup);
+
+  const patternGroup = createEl('div', 'form-group');
+  patternGroup.appendChild(createEl('label', '', 'Pattern (URL filter or CSS selector)'));
+  patternGroup.appendChild(createEl('input', 'input', '', { id: 'rulePattern', type: 'text', placeholder: '||example.com^ or .ad-banner' }));
+  patternGroup.appendChild(createEl('p', 'hint', 'Use AdBlock Plus syntax for network filters, CSS selectors for cosmetic filters'));
+  addSection.appendChild(patternGroup);
+
+  const domainsGroup = createEl('div', 'form-group', '', { id: 'ruleDomainsGroup', style: 'display: none;' });
+  domainsGroup.appendChild(createEl('label', '', 'Domains (comma-separated, optional)'));
+  domainsGroup.appendChild(createEl('input', 'input', '', { id: 'ruleDomains', type: 'text', placeholder: 'example.com, another.com' }));
+  domainsGroup.appendChild(createEl('p', 'hint', 'Limit rule to specific domains (for network filters)'));
+  addSection.appendChild(domainsGroup);
+
+  const redirectGroup = createEl('div', 'form-group', '', { id: 'ruleRedirectGroup', style: 'display: none;' });
+  redirectGroup.appendChild(createEl('label', '', 'Redirect URL'));
+  redirectGroup.appendChild(createEl('input', 'input', '', { id: 'ruleRedirect', type: 'url', placeholder: 'https://example.com/blank.png' }));
+  addSection.appendChild(redirectGroup);
+
+  const btnAddRule = createEl('button', 'btn btn-primary', 'Add Rule', { id: 'btnAddRule' });
+  addSection.appendChild(btnAddRule);
+  panel.appendChild(addSection);
+
+  // Rules List section
+  const listSection = createEl('section', 'section');
+  listSection.appendChild(createEl('h3', 'section-title', `Your Rules (${customRules.length})`));
+  if (customRules.length === 0) {
+    const empty = createEl('div', 'empty-state');
+    empty.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>'));
+    empty.appendChild(createEl('h3', '', 'No custom rules yet'));
+    empty.appendChild(createEl('p', '', 'Create rules to block specific content or allow exceptions'));
+    listSection.appendChild(empty);
+  } else {
+    const list = createEl('div', 'rule-list', '', { id: 'ruleList' });
+    customRules.forEach(rule => {
+      const item = createEl('div', 'rule-item', '', { 'data-id': rule.id });
+      item.appendChild(createEl('span', 'rule-type', rule.type));
+      item.appendChild(createEl('span', 'rule-pattern', rule.pattern));
+      if (rule.domains) {
+        item.appendChild(createEl('span', 'rule-pattern', `@ ${rule.domains.join(', ')}`, { style: 'color: var(--text-secondary); font-size: 11px;' }));
+      }
+      const actions = createEl('div', 'rule-actions');
+      const delBtn = createEl('button', 'btn btn-ghost btn-delete-rule', '', { 'data-id': rule.id, 'title': 'Delete', 'aria-label': 'Delete rule' });
+      delBtn.appendChild(createSvg('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'));
+      actions.appendChild(delBtn);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+    listSection.appendChild(list);
+  }
+  panel.appendChild(listSection);
+  body.appendChild(panel);
 
   // Show/hide fields based on rule type
   const ruleType = document.getElementById('ruleType');
@@ -458,7 +445,6 @@ function renderCustomRulesTab() {
     ruleDomainsGroup.style.display = ['block', 'redirect'].includes(type) ? 'block' : 'none';
     ruleRedirectGroup.style.display = type === 'redirect' ? 'block' : 'none';
   }
-
   ruleType.addEventListener('change', updateRuleFields);
   updateRuleFields();
 
@@ -471,10 +457,7 @@ function renderCustomRulesTab() {
   if (btnAddRule) {
     btnAddRule.addEventListener('click', async () => {
       const pattern = rulePattern.value.trim();
-      if (!pattern) {
-        showStatus('Please enter a pattern', 'error');
-        return;
-      }
+      if (!pattern) { showStatus('Please enter a pattern', 'error'); return; }
 
       const rule = {
         type: ruleType.value,
@@ -513,78 +496,78 @@ function renderCustomRulesTab() {
 
 // Allowlist Tab
 function renderAllowlistTab() {
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">Allowlist</h2>
-        <p class="panel-subtitle">Domains where ad blocking is disabled</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        <h3 class="section-title">Add to Allowlist</h3>
-        <div class="form-group">
-          <label>Domain</label>
-          <input type="text" class="input" id="allowlistDomain" placeholder="example.com" />
-          <p class="hint">Enter a domain to disable ad blocking on that site</p>
-        </div>
-        <button class="btn btn-primary" id="btnAddAllowlist">Add Domain</button>
-      </section>
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'Allowlist'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Domains where ad blocking is disabled'));
+  panel.appendChild(header);
 
-      <section class="section">
-        <h3 class="section-title">Allowlisted Domains (${allowlist.length})</h3>
-        ${allowlist.length === 0 ? `
-          <div class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <h3>No allowlisted domains</h3>
-            <p>Add domains where you want to allow ads</p>
-          </div>
-        ` : `
-          <div class="allowlist-list" id="allowlistList">
-            ${allowlist.map(item => `
-              <div class="allowlist-item" data-domain="${escapeHtml(item.domain)}">
-                <span class="allowlist-domain">${escapeHtml(item.domain)}</span>
-                <span class="rule-type">${item.type || 'domain'}</span>
-                <div class="rule-actions">
-                  <button class="btn btn-ghost btn-remove-allowlist" data-domain="${escapeHtml(item.domain)}" title="Remove" aria-label="Remove from allowlist">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        `}
-      </section>
+  // Add to Allowlist section
+  const addSection = createEl('section', 'section');
+  addSection.appendChild(createEl('h3', 'section-title', 'Add to Allowlist'));
+  const domainGroup = createEl('div', 'form-group');
+  domainGroup.appendChild(createEl('label', '', 'Domain'));
+  domainGroup.appendChild(createEl('input', 'input', '', { id: 'allowlistDomain', type: 'text', placeholder: 'example.com' }));
+  domainGroup.appendChild(createEl('p', 'hint', 'Enter a domain to disable ad blocking on that site'));
+  addSection.appendChild(domainGroup);
+  const btnAddAllowlist = createEl('button', 'btn btn-primary', 'Add Domain', { id: 'btnAddAllowlist' });
+  addSection.appendChild(btnAddAllowlist);
+  panel.appendChild(addSection);
 
-      <section class="section">
-        <h3 class="section-title">Quick Actions</h3>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <button class="btn btn-secondary" id="btnAllowCurrentSite">Allow Current Site</button>
-          <button class="btn btn-outline" id="btnClearAllowlist">Clear All</button>
-        </div>
-      </section>
-    </div>
-  `;
+  // Allowlisted Domains section
+  const listSection = createEl('section', 'section');
+  listSection.appendChild(createEl('h3', 'section-title', `Allowlisted Domains (${allowlist.length})`));
+  if (allowlist.length === 0) {
+    const empty = createEl('div', 'empty-state');
+    empty.appendChild(createSvg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'));
+    empty.appendChild(createEl('h3', '', 'No allowlisted domains'));
+    empty.appendChild(createEl('p', '', 'Add domains where you want to allow ads'));
+    listSection.appendChild(empty);
+  } else {
+    const list = createEl('div', 'allowlist-list', '', { id: 'allowlistList' });
+    allowlist.forEach(item => {
+      const el = createEl('div', 'allowlist-item', '', { 'data-domain': item.domain });
+      el.appendChild(createEl('span', 'allowlist-domain', item.domain));
+      el.appendChild(createEl('span', 'rule-type', item.type || 'domain'));
+      const actions = createEl('div', 'rule-actions');
+      const delBtn = createEl('button', 'btn btn-ghost btn-remove-allowlist', '', { 'data-domain': item.domain, 'title': 'Remove', 'aria-label': 'Remove from allowlist' });
+      delBtn.appendChild(createSvg('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'));
+      actions.appendChild(delBtn);
+      el.appendChild(actions);
+      list.appendChild(el);
+    });
+    listSection.appendChild(list);
+  }
+  panel.appendChild(listSection);
+
+  // Quick Actions
+  const quickSection = createEl('section', 'section');
+  quickSection.appendChild(createEl('h3', 'section-title', 'Quick Actions'));
+  const quickActions = createEl('div', '', '', { style: 'display: flex; gap: 12px; flex-wrap: wrap;' });
+  const btnAllowCurrentSite = createEl('button', 'btn btn-secondary', 'Allow Current Site', { id: 'btnAllowCurrentSite' });
+  const btnClearAllowlist = createEl('button', 'btn btn-outline', 'Clear All', { id: 'btnClearAllowlist' });
+  quickActions.appendChild(btnAllowCurrentSite);
+  quickActions.appendChild(btnClearAllowlist);
+  quickSection.appendChild(quickActions);
+  panel.appendChild(quickSection);
+
+  body.appendChild(panel);
 
   // Add to allowlist
   const btnAddAllowlist = document.getElementById('btnAddAllowlist');
   const allowlistDomain = document.getElementById('allowlistDomain');
-
   if (btnAddAllowlist) {
     btnAddAllowlist.addEventListener('click', async () => {
       const domain = allowlistDomain.value.trim().toLowerCase();
-      if (!domain) {
-        showStatus('Please enter a domain', 'error');
-        return;
-      }
-
+      if (!domain) { showStatus('Please enter a domain', 'error'); return; }
       try {
         await chrome.runtime.sendMessage({ type: 'ADD_TO_ALLOWLIST', domain, type: 'domain' });
         showStatus(`Added ${domain} to allowlist`, 'success');
         allowlistDomain.value = '';
         await loadAllowlist();
-      } catch (err) {
-        showStatus('Failed to add domain', 'error');
-      }
+      } catch (err) { showStatus('Failed to add domain', 'error'); }
     });
   }
 
@@ -596,9 +579,7 @@ function renderAllowlistTab() {
         await chrome.runtime.sendMessage({ type: 'REMOVE_FROM_ALLOWLIST', domain });
         showStatus(`Removed ${domain} from allowlist`, 'success');
         await loadAllowlist();
-      } catch (err) {
-        showStatus('Failed to remove domain', 'error');
-      }
+      } catch (err) { showStatus('Failed to remove domain', 'error'); }
     });
   });
 
@@ -613,9 +594,7 @@ function renderAllowlistTab() {
           await chrome.runtime.sendMessage({ type: 'ADD_TO_ALLOWLIST', domain, type: 'domain' });
           showStatus(`Added ${domain} to allowlist`, 'success');
           await loadAllowlist();
-        } catch (err) {
-          showStatus('Failed to add domain', 'error');
-        }
+        } catch (err) { showStatus('Failed to add domain', 'error'); }
       }
     });
   }
@@ -637,91 +616,93 @@ function renderAllowlistTab() {
 
 // Statistics Tab
 function renderStatisticsTab() {
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
+
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'Statistics'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Detailed blocking statistics'));
+  panel.appendChild(header);
+
   const total = statistics.totalBlocked || 0;
   const byType = statistics.byType || {};
   const byDomain = statistics.byDomain || {};
-  const topDomains = Object.entries(byDomain)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  const topDomains = Object.entries(byDomain).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">Statistics</h2>
-        <p class="panel-subtitle">Detailed blocking statistics</p>
-      </div>
+  const statsGrid = createEl('div', 'stats-grid');
+  [
+    { value: total.toLocaleString(), label: 'Total Blocked' },
+    { value: Object.values(byType).reduce((a, b) => a + b, 0).toLocaleString(), label: 'Network Requests' },
+    { value: Object.keys(byDomain).length, label: 'Domains Blocked' },
+    { value: statistics.firstRun ? Math.ceil((Date.now() - statistics.firstRun) / 86400000) : 0, label: 'Days Active' }
+  ].forEach(s => {
+    const card = createEl('div', 'stat-card');
+    card.appendChild(createEl('div', 'stat-value', s.value));
+    card.appendChild(createEl('div', 'stat-label', s.label));
+    statsGrid.appendChild(card);
+  });
+  panel.appendChild(statsGrid);
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">${total.toLocaleString()}</div>
-          <div class="stat-label">Total Blocked</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${Object.values(byType).reduce((a, b) => a + b, 0).toLocaleString()}</div>
-          <div class="stat-label">Network Requests</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${Object.keys(byDomain).length}</div>
-          <div class="stat-label">Domains Blocked</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${statistics.firstRun ? Math.ceil((Date.now() - statistics.firstRun) / 86400000) : 0}</div>
-          <div class="stat-label">Days Active</div>
-        </div>
-      </div>
+  // Blocked by Type
+  const typeSection = createEl('section', 'section');
+  typeSection.appendChild(createEl('h3', 'section-title', 'Blocked by Type'));
+  const typeList = createEl('div', 'rule-list');
+  Object.entries(byType).sort((a, b) => b[1] - a[1]).forEach(([type, count]) => {
+    const item = createEl('div', 'rule-item');
+    item.appendChild(createEl('span', 'rule-pattern', type));
+    item.appendChild(createEl('span', 'rule-type', count.toLocaleString(), { style: 'background: var(--accent-light); color: var(--accent);' }));
+    typeList.appendChild(item);
+  });
+  typeSection.appendChild(typeList);
+  panel.appendChild(typeSection);
 
-      <section class="section">
-        <h3 class="section-title">Blocked by Type</h3>
-        <div class="rule-list">
-          ${Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => `
-            <div class="rule-item">
-              <span class="rule-pattern">${escapeHtml(type)}</span>
-              <span class="rule-type" style="background: var(--accent-light); color: var(--accent);">${count.toLocaleString()}</span>
-            </div>
-          `).join('') || '<div class="empty-state"><p>No data yet</p></div>'}
-        </div>
-      </section>
+  // Top Blocked Domains
+  const domainSection = createEl('section', 'section');
+  domainSection.appendChild(createEl('h3', 'section-title', 'Top Blocked Domains'));
+  const domainList = createEl('div', 'rule-list');
+  if (topDomains.length > 0) {
+    topDomains.forEach(([domain, count]) => {
+      const item = createEl('div', 'rule-item');
+      item.appendChild(createEl('span', 'rule-pattern', domain));
+      item.appendChild(createEl('span', 'rule-type', count.toLocaleString(), { style: 'background: var(--danger-light); color: var(--danger);' }));
+      const actions = createEl('div', 'rule-actions');
+      const allowBtn = createEl('button', 'btn btn-ghost btn-allow-domain', 'Allow', { 'data-domain': domain, title: 'Allow this domain' });
+      actions.appendChild(allowBtn);
+      item.appendChild(actions);
+      domainList.appendChild(item);
+    });
+  } else {
+    domainList.appendChild(createEl('div', 'empty-state', 'No domains blocked yet'));
+  }
+  domainSection.appendChild(domainList);
+  panel.appendChild(domainSection);
 
-      <section class="section">
-        <h3 class="section-title">Top Blocked Domains</h3>
-        <div class="rule-list">
-          ${topDomains.length > 0 ? topDomains.map(([domain, count]) => `
-            <div class="rule-item">
-              <span class="rule-pattern">${escapeHtml(domain)}</span>
-              <span class="rule-type" style="background: var(--danger-light); color: var(--danger);">${count.toLocaleString()}</span>
-              <div class="rule-actions">
-                <button class="btn btn-ghost btn-allow-domain" data-domain="${escapeHtml(domain)}" title="Allow this domain">Allow</button>
-              </div>
-            </div>
-          `).join('') : '<div class="empty-state"><p>No domains blocked yet</p></div>'}
-        </div>
-      </section>
+  // Timeline
+  const timelineSection = createEl('section', 'section');
+  timelineSection.appendChild(createEl('h3', 'section-title', 'Timeline (Last 30 Days)'));
+  const timeline = createEl('div', '', '', { style: 'height: 200px; display: flex; align-items: end; gap: 4px; padding: 16px 0;' });
+  Object.entries(statistics.timeline || {}).sort((a, b) => a[0].localeCompare(b[0])).slice(-30).forEach(([date, count]) => {
+    const max = Math.max(...Object.values(statistics.timeline || {}), 1);
+    const height = (count / max) * 180;
+    const bar = createEl('div', '', '', { style: 'flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;' });
+    bar.appendChild(createEl('div', '', '', { style: `width: 100%; height: ${height}px; background: var(--accent); border-radius: 2px 2px 0 0; transition: height 0.3s;` }));
+    bar.appendChild(createEl('span', '', date.slice(5), { style: 'font-size: 10px; color: var(--text-muted);' }));
+    timeline.appendChild(bar);
+  });
+  timelineSection.appendChild(timeline);
+  panel.appendChild(timelineSection);
 
-      <section class="section">
-        <h3 class="section-title">Timeline (Last 30 Days)</h3>
-        <div style="height: 200px; display: flex; align-items: end; gap: 4px; padding: 16px 0;">
-          ${Object.entries(statistics.timeline || {})
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .slice(-30)
-            .map(([date, count]) => {
-              const max = Math.max(...Object.values(statistics.timeline || {}), 1);
-              const height = (count / max) * 180;
-              return `<div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                <div style="width: 100%; height: ${height}px; background: var(--accent); border-radius: 2px 2px 0 0; transition: height 0.3s;"></div>
-                <span style="font-size: 10px; color: var(--text-muted);">${date.slice(5)}</span>
-              </div>`;
-            }).join('')}
-        </div>
-      </section>
+  // Reset/Export
+  const actionSection = createEl('section', 'section');
+  const actionDiv = createEl('div', '', '', { style: 'display: flex; gap: 12px; justify-content: center;' });
+  const btnResetStats = createEl('button', 'btn btn-danger', 'Reset All Statistics', { id: 'btnResetStats' });
+  const btnExportStats = createEl('button', 'btn btn-outline', 'Export Data', { id: 'btnExportStats' });
+  actionDiv.appendChild(btnResetStats);
+  actionDiv.appendChild(btnExportStats);
+  actionSection.appendChild(actionDiv);
+  panel.appendChild(actionSection);
 
-      <section class="section">
-        <div style="display: flex; gap: 12px; justify-content: center;">
-          <button class="btn btn-danger" id="btnResetStats">Reset All Statistics</button>
-          <button class="btn btn-outline" id="btnExportStats">Export Data</button>
-        </div>
-      </section>
-    </div>
-  `;
+  body.appendChild(panel);
 
   // Allow domain from stats
   body.querySelectorAll('.btn-allow-domain').forEach(btn => {
@@ -731,9 +712,7 @@ function renderStatisticsTab() {
         await chrome.runtime.sendMessage({ type: 'ADD_TO_ALLOWLIST', domain, type: 'domain' });
         showStatus(`Added ${domain} to allowlist`, 'success');
         await loadAllowlist();
-      } catch (err) {
-        showStatus('Failed to allow domain', 'error');
-      }
+      } catch (err) { showStatus('Failed to allow domain', 'error'); }
     });
   });
 
@@ -746,9 +725,7 @@ function renderStatisticsTab() {
           await chrome.runtime.sendMessage({ type: 'RESET_STATISTICS' });
           showStatus('Statistics reset', 'success');
           await loadStatistics();
-        } catch (err) {
-          showStatus('Failed to reset statistics', 'error');
-        }
+        } catch (err) { showStatus('Failed to reset statistics', 'error'); }
       }
     });
   }
@@ -766,78 +743,59 @@ function renderStatisticsTab() {
 
 // Advanced Tab
 function renderAdvancedTab() {
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header">
-        <h2 class="panel-title">Advanced</h2>
-        <p class="panel-subtitle">Advanced configuration options</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        <h3 class="section-title">Experimental Features</h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Advanced Mode</div>
-            <div class="setting-desc">Enable advanced settings and debug features</div>
-          </div>
-          <button class="toggle-switch ${settings.advancedMode ? 'active' : ''}" data-setting="advancedMode"></button>
-        </div>
-      </section>
+  const header = createEl('div', 'panel-header');
+  header.appendChild(createEl('h2', 'panel-title', 'Advanced'));
+  header.appendChild(createEl('p', 'panel-subtitle', 'Advanced configuration options'));
+  panel.appendChild(header);
 
-      <section class="section">
-        <h3 class="section-title">Privacy Protection</h3>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block WebRTC</div>
-            <div class="setting-desc">Prevent WebRTC IP leaks (may affect video calls)</div>
-          </div>
-          <button class="toggle-switch ${settings.blockWebRTC ? 'active' : ''}" data-setting="blockWebRTC"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block Fingerprinting</div>
-            <div class="setting-desc">Block canvas, audio, and battery fingerprinting</div>
-          </div>
-          <button class="toggle-switch ${settings.blockFingerprinting ? 'active' : ''}" data-setting="blockFingerprinting"></button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Block CSP Reports</div>
-            <div class="setting-desc">Block Content Security Policy violation reports</div>
-          </div>
-          <button class="toggle-switch ${settings.blockCSPReports ? 'active' : ''}" data-setting="blockCSPReports"></button>
-        </div>
-      </section>
+  // Experimental Features
+  const expSection = createEl('section', 'section');
+  expSection.appendChild(createEl('h3', 'section-title', 'Experimental Features'));
+  expSection.appendChild(createSettingRow('Advanced Mode', 'Enable advanced settings and debug features', 'advancedMode', settings.advancedMode));
+  panel.appendChild(expSection);
 
-      <section class="section">
-        <h3 class="section-title">Debug & Development</h3>
-        <div class="form-group">
-          <label>Debug Log Level</label>
-          <select class="select" id="debugLevel">
-            <option value="none" ${settings.debugLevel === 'none' ? 'selected' : ''}>None</option>
-            <option value="error" ${settings.debugLevel === 'error' ? 'selected' : ''}>Errors Only</option>
-            <option value="warn" ${settings.debugLevel === 'warn' ? 'selected' : ''}>Warnings</option>
-            <option value="info" ${settings.debugLevel === 'info' ? 'selected' : ''}>Info</option>
-            <option value="debug" ${settings.debugLevel === 'debug' ? 'selected' : ''}>Debug</option>
-          </select>
-        </div>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;">
-          <button class="btn btn-secondary" id="btnViewLogs">View Console Logs</button>
-          <button class="btn btn-outline" id="btnClearLogs">Clear Logs</button>
-        </div>
-      </section>
+  // Privacy Protection
+  const privacySection = createEl('section', 'section');
+  privacySection.appendChild(createEl('h3', 'section-title', 'Privacy Protection'));
+  privacySection.appendChild(createSettingRow('Block WebRTC', 'Prevent WebRTC IP leaks (may affect video calls)', 'blockWebRTC', settings.blockWebRTC));
+  privacySection.appendChild(createSettingRow('Block Fingerprinting', 'Block canvas, audio, and battery fingerprinting', 'blockFingerprinting', settings.blockFingerprinting));
+  privacySection.appendChild(createSettingRow('Block CSP Reports', 'Block Content Security Policy violation reports', 'blockCSPReports', settings.blockCSPReports));
+  panel.appendChild(privacySection);
 
-      <section class="section">
-        <h3 class="section-title">Danger Zone</h3>
-        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">These actions are irreversible.</p>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-          <button class="btn btn-danger" id="btnResetAll">Reset All Settings</button>
-          <button class="btn btn-outline" id="btnResetRules">Reset Custom Rules</button>
-          <button class="btn btn-outline" id="btnResetAllowlist">Reset Allowlist</button>
-        </div>
-      </section>
-    </div>
-  `;
+  // Debug & Development
+  const debugSection = createEl('section', 'section');
+  debugSection.appendChild(createEl('h3', 'section-title', 'Debug & Development'));
+  const debugGroup = createEl('div', 'form-group');
+  debugGroup.appendChild(createEl('label', '', 'Debug Log Level'));
+  const debugSelect = createEl('select', 'select', '', { id: 'debugLevel' });
+  ['None', 'Errors Only', 'Warnings', 'Info', 'Debug'].forEach((label, i) => {
+    const opt = createEl('option', '', label, { value: ['none', 'error', 'warn', 'info', 'debug'][i] });
+    if (settings.debugLevel === ['none', 'error', 'warn', 'info', 'debug'][i]) opt.selected = true;
+    debugSelect.appendChild(opt);
+  });
+  debugGroup.appendChild(debugSelect);
+  debugSection.appendChild(debugGroup);
+  const debugBtns = createEl('div', '', '', { style: 'display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px;' });
+  debugBtns.appendChild(createEl('button', 'btn btn-secondary', 'View Console Logs', { id: 'btnViewLogs' }));
+  debugBtns.appendChild(createEl('button', 'btn btn-outline', 'Clear Logs', { id: 'btnClearLogs' }));
+  debugSection.appendChild(debugBtns);
+  panel.appendChild(debugSection);
+
+  // Danger Zone
+  const dangerSection = createEl('section', 'section');
+  dangerSection.appendChild(createEl('h3', 'section-title', 'Danger Zone'));
+  dangerSection.appendChild(createEl('p', '', 'These actions are irreversible.', { style: 'color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;' }));
+  const dangerBtns = createEl('div', '', '', { style: 'display: flex; gap: 12px; flex-wrap: wrap;' });
+  dangerBtns.appendChild(createEl('button', 'btn btn-danger', 'Reset All Settings', { id: 'btnResetAll' }));
+  dangerBtns.appendChild(createEl('button', 'btn btn-outline', 'Reset Custom Rules', { id: 'btnResetRules' }));
+  dangerBtns.appendChild(createEl('button', 'btn btn-outline', 'Reset Allowlist', { id: 'btnResetAllowlist' }));
+  dangerSection.appendChild(dangerBtns);
+  panel.appendChild(dangerSection);
+
+  body.appendChild(panel);
 
   // Bind advanced toggles
   body.querySelectorAll('.toggle-switch[data-setting]').forEach(btn => {
@@ -870,9 +828,7 @@ function renderAdvancedTab() {
             showStatus('All data reset', 'success');
             await loadAllData();
             renderTab(currentTab);
-          } catch (err) {
-            showStatus('Failed to reset', 'error');
-          }
+          } catch (err) { showStatus('Failed to reset', 'error'); }
         }
       }
     });
@@ -914,88 +870,83 @@ function renderAdvancedTab() {
 
 // About Tab
 function renderAboutTab() {
-  const manifest = chrome.runtime.getManifest();
-  body.innerHTML = `
-    <div class="tab-panel active">
-      <div class="panel-header" style="text-align: center; padding-top: 24px;">
-        <div style="width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, var(--accent), #6c5ce7); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 8px 24px rgba(0,122,255,0.3);">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-            <path d="M12 17.5a5.5 5.5 0 0 1-5.5-5.5h-1a5.5 5.5 0 1 1 11 0h-1a5.5 5.5 0 0 1-5.5 5.5z"/>
-            <path fill="white" d="M10.5 12h3v1.5h-3z"/>
-          </svg>
-        </div>
-        <h2 class="panel-title" style="font-size: 28px;">Purple Ad Blocker</h2>
-        <p class="panel-subtitle" style="font-size: 16px;">Version ${manifest.version}</p>
-      </div>
+  clearEl(body);
+  const panel = createEl('div', 'tab-panel active');
 
-      <section class="section">
-        <h3 class="section-title">About</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Manifest Version</div>
-            <div style="font-weight: 600;">${manifest.manifest_version}</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Base Rules</div>
-            <div style="font-weight: 600;">100+ domains</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Filter Lists</div>
-            <div style="font-weight: 600;">5 supported</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Custom Rules</div>
-            <div style="font-weight: 600;">Unlimited</div>
-          </div>
-        </div>
-      </section>
+  const header = createEl('div', 'panel-header', '', { style: 'text-align: center; padding-top: 24px;' });
+  const iconDiv = createEl('div', '', '', { style: 'width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, var(--accent), #6c5ce7); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 8px 24px rgba(0,122,255,0.3);' });
+  iconDiv.appendChild(createSvg('<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M12 17.5a5.5 5.5 0 0 1-5.5-5.5h-1a5.5 5.5 0 1 1 11 0h-1a5.5 5.5 0 0 1-5.5 5.5z"/><path fill="white" d="M10.5 12h3v1.5h-3z"/></svg>'));
+  header.appendChild(iconDiv);
+  header.appendChild(createEl('h2', 'panel-title', 'Purple Ad Blocker', { style: 'font-size: 28px;' }));
+  header.appendChild(createEl('p', 'panel-subtitle', `Version ${chrome.runtime.getManifest().version}`, { style: 'font-size: 16px;' }));
+  panel.appendChild(header);
 
-      <section class="section">
-        <h3 class="section-title">Features</h3>
-        <ul style="list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
-          ${[
-            '🛡️ Network-level ad & tracker blocking',
-            '🎨 Cosmetic element hiding',
-            '🎯 Interactive element zapper',
-            '📊 Detailed statistics & analytics',
-            '📋 Multiple filter list support (EasyList, EasyPrivacy, Fanboy, uBlock)',
-            '⚙️ Custom blocking rules with ABP syntax',
-            '✅ Per-site allowlist/exceptions',
-            '🔄 Auto-updating filter lists',
-            '📤 Import/Export settings',
-            '🌙 Dark/Light/System theme support',
-            '⌨️ Keyboard shortcuts (Alt+Shift+A/Z/S)',
-            '🖱️ Right-click context menu integration'
-          ].map(f => `<li style="padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); font-size: 14px;">${f}</li>`).join('')}
-        </ul>
-      </section>
+  // About section
+  const aboutSection = createEl('section', 'section');
+  aboutSection.appendChild(createEl('h3', 'section-title', 'About'));
+  const grid = createEl('div', '', '', { style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;' });
+  [
+    { label: 'Manifest Version', value: chrome.runtime.getManifest().manifest_version },
+    { label: 'Base Rules', value: '100+ domains' },
+    { label: 'Filter Lists', value: '5 supported' },
+    { label: 'Custom Rules', value: 'Unlimited' }
+  ].forEach(item => {
+    const card = createEl('div', '', '', { style: 'padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);' });
+    card.appendChild(createEl('div', '', item.label, { style: 'font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;' }));
+    card.appendChild(createEl('div', '', item.value, { style: 'font-weight: 600;' }));
+    grid.appendChild(card);
+  });
+  aboutSection.appendChild(grid);
+  panel.appendChild(aboutSection);
 
-      <section class="section">
-        <h3 class="section-title">Links</h3>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-          <a href="https://github.com/purple-dev" class="btn btn-secondary" target="_blank">GitHub</a>
-          <a href="https://github.com/purple-dev/issues" class="btn btn-outline" target="_blank">Report Issue</a>
-        </div>
-      </section>
+  // Features
+  const featuresSection = createEl('section', 'section');
+  featuresSection.appendChild(createEl('h3', 'section-title', 'Features'));
+  const featuresList = createEl('ul', '', '', { style: 'list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;' });
+  [
+    '🛡️ Network-level ad & tracker blocking',
+    '🎨 Cosmetic element hiding',
+    '🎯 Interactive element zapper',
+    '📊 Detailed statistics & analytics',
+    '📋 Multiple filter list support (EasyList, EasyPrivacy, Fanboy, uBlock)',
+    '⚙️ Custom blocking rules with ABP syntax',
+    '✅ Per-site allowlist/exceptions',
+    '🔄 Auto-updating filter lists',
+    '📤 Import/Export settings',
+    '🌙 Dark/Light/System theme support',
+    '⌨️ Keyboard shortcuts (Alt+Shift+A/Z/S)',
+    '🖱️ Right-click context menu integration'
+  ].forEach(f => {
+    const li = createEl('li', '', f, { style: 'padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); font-size: 14px;' });
+    featuresList.appendChild(li);
+  });
+  featuresSection.appendChild(featuresList);
+  panel.appendChild(featuresSection);
 
-      <section class="section">
-        <h3 class="section-title">Credits</h3>
-        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.8;">
-          Created by <strong>purple-dev</strong>.<br>
-          Built with Manifest V3 for Chrome, Edge, Brave, and Firefox.<br>
-          Filter lists powered by <a href="https://easylist.to/" target="_blank" style="color: var(--accent);">EasyList</a>,
-          <a href="https://github.com/uBlockOrigin/uAssets" target="_blank" style="color: var(--accent);">uBlock Origin</a>,
-          and <a href="https://github.com/ryanbr/fanboy-adblock" target="_blank" style="color: var(--accent);">Fanboy's Lists</a>.<br>
-          Icons from <a href="https://feathericons.com/" target="_blank" style="color: var(--accent);">Feather Icons</a>.
-        </p>
-      </section>
+  // Links
+  const linksSection = createEl('section', 'section');
+  linksSection.appendChild(createEl('h3', 'section-title', 'Links'));
+  const linksDiv = createEl('div', '', '', { style: 'display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;' });
+  linksDiv.appendChild(createEl('a', 'btn btn-secondary', 'Documentation', { href: '#', target: '_blank' }));
+  linksDiv.appendChild(createEl('a', 'btn btn-secondary', 'GitHub', { href: 'https://github.com/purple-dev', target: '_blank' }));
+  linksDiv.appendChild(createEl('a', 'btn btn-outline', 'Report Issue', { href: '#', target: '_blank' }));
+  linksDiv.appendChild(createEl('a', 'btn btn-outline', 'Privacy Policy', { href: '#', target: '_blank' }));
+  linksSection.appendChild(linksDiv);
+  panel.appendChild(linksSection);
 
-      <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;">
-        © 2024 Purple Ad Blocker by purple-dev. Open source under MIT License.
-      </div>
-    </div>
-  `;
+  // Credits
+  const creditsSection = createEl('section', 'section');
+  creditsSection.appendChild(createEl('h3', 'section-title', 'Credits'));
+  const credits = createEl('p', '', '', { style: 'color: var(--text-secondary); font-size: 14px; line-height: 1.8;' });
+  credits.innerHTML = 'Created by <strong>purple-dev</strong>.<br>Built with Manifest V3 for Chrome, Edge, Brave, and Firefox.<br>Filter lists powered by <a href="https://easylist.to/" target="_blank" style="color: var(--accent);">EasyList</a>, <a href="https://github.com/uBlockOrigin/uAssets" target="_blank" style="color: var(--accent);">uBlock Origin</a>, and <a href="https://github.com/ryanbr/fanboy-adblock" target="_blank" style="color: var(--accent);">Fanboy\'s Lists</a>.<br>Icons from <a href="https://feathericons.com/" target="_blank" style="color: var(--accent);">Feather Icons</a>.';
+  creditsSection.appendChild(credits);
+  panel.appendChild(creditsSection);
+
+  // Copyright
+  const copyright = createEl('div', '', '© 2024 Purple Ad Blocker by purple-dev. Open source under MIT License.', { style: 'text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;' });
+  panel.appendChild(copyright);
+
+  body.appendChild(panel);
 }
 
 // Export/Import
@@ -1005,20 +956,9 @@ async function exportSettings() {
   showStatus('Settings exported', 'success');
 }
 
-function downloadJSON(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 async function importSettings(e) {
   const file = e.target.files[0];
   if (!file) return;
-
   try {
     const text = await file.text();
     const data = JSON.parse(text);
@@ -1026,9 +966,7 @@ async function importSettings(e) {
     showStatus('Settings imported successfully', 'success');
     await loadAllData();
     renderTab(currentTab);
-  } catch (err) {
-    showStatus('Failed to import: ' + err.message, 'error');
-  }
+  } catch (err) { showStatus('Failed to import: ' + err.message, 'error'); }
   e.target.value = '';
 }
 
